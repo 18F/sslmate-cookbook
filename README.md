@@ -108,3 +108,11 @@ Currently this relies on a beta version of SSLMate, so you must specify the `git
   
   It will prompt for your SSLMate and AWS credentials the first time it's run. It will then purchase the certificate and configure the defined ELBs to use it.
 3. **Tada!** That should be all that's necessary. A cron job will also get installed in `/etc/cron.daily/sslmate_example.com_auto_renew`. This will automatically download and install a new SSL certificate on a yearly basis when SSLMate renews your cert.
+
+### Public domain
+
+This project is in the worldwide [public domain](LICENSE.md). As stated in [CONTRIBUTING](CONTRIBUTING.md):
+
+> This project is in the public domain within the United States, and copyright and related rights in the work worldwide are waived through the [CC0 1.0 Universal public domain dedication](https://creativecommons.org/publicdomain/zero/1.0/).
+>
+> All contributions to this project will be released under the CC0 dedication. By submitting a pull request, you are agreeing to comply with this waiver of copyright interest.

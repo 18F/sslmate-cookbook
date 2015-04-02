@@ -1,0 +1,37 @@
+#!/bin/bash
+set -e
+
+HOST="<%= @domain[:host] %>"
+ELB_NAME="<%= @domain[:elb_name] %>"
+CERT_NAME="$HOST-$(date -u +%FT%H-%M-%SZ)"
+AWS_DEFAULT_PROFILE=sslmate
+
+# Only run as root to protect the SSLMate and AWS credentials.
+if [[ $EUID -ne 0 ]]; then
+  echo "This script must be run as root" 1>&2
+  exit 1
+fi
+
+# Upload the certificate under a new timestamped name.
+RESPONSE=$(aws iam upload-server-certificate \
+  --server-certificate-name $CERT_NAME \
+  --certificate-body file:///etc/sslmate/$HOST.crt \
+  --private-key file:///etc/sslmate/$HOST.key \
+  --certificate-chain file:///etc/sslmate/$HOST.chain.crt)
+
+# Poor man's JSON parsing to figure out the certificate ID.
+CERT_ID=$(echo $RESPONSE | sed -n -e 's/.*"Arn": *"\([^"]*\)".*/\1/p')
+
+if [ -z "$CERT_ID" ]; then
+  echo "Could not determine certificate ID. Did it upload successfully?" 1>&2
+  exit 1
+fi
+
+<% @domain[:elbs].each do |elb| %>
+# Set each ELB that should use this certificate.
+aws elb set-load-balancer-listener-ssl-certificate \
+  --region <%= elb[:region] %> \
+  --load-balancer-name <%= elb[:name] %> \
+  --load-balancer-port <%= elb[:port] || 443 %> \
+  --ssl-certificate-id $CERT_ID
+<% end %>

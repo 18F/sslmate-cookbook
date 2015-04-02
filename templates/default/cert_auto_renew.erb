@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+
+HOST="<%= @domain[:host] %>"
+HOME="/root"
+
+# Only run as root to protect the SSLMate and AWS credentials.
+if [[ $EUID -ne 0 ]]; then
+  echo "This script must be run as root" 1>&2
+  exit 1
+fi
+
+# If sslmate downloads a new certificate, then that means it's automatically
+# been renewed for us. Proceed to install it.
+if sslmate download $HOST > /dev/null; then
+  <%= node[:sslmate][:prefix] %>/sbin/sslmate_$HOST_install
+fi

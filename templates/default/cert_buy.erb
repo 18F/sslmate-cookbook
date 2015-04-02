@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+
+HOST="<%= @domain[:host] %>"
+HOME="/root"
+
+# Only run as root to protect the SSLMate and AWS credentials.
+if [[ $EUID -ne 0 ]]; then
+  echo "This script must be run as root" 1>&2
+  exit 1
+fi
+
+# Since this triggers purchasing a certificate, be sure we want to run this.
+read -p "Are you sure you want to purchase a *new* certificate for $HOST (y/n)? "
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+  exit 1
+fi
+
+# Prompt for SSLMate authentication if it's not already setup.
+if ! grep -q "api_key" $HOME/.sslmate > /dev/null 2>&1; then
+  sslmate link
+fi
+
+# Prompt for AWS credentials if it's not already setup.
+if ! grep -q "^\[sslmate\]" $HOME/.aws/credentials > /dev/null 2>&1; then
+  read -p "AWS Access Key: " AWS_ACCESS_KEY
+  read -p "AWS Secret Key: " AWS_SECRET_KEY
+
+  if [ ! -f $HOME/.aws/credentials ]; then
+    mkdir -p $HOME/.aws
+    touch $HOME/.aws/credentials
+    chmod 600 $HOME/.aws/credentials
+  fi
+
+  # Install the AWS credentials under a "sslmate" profile.
+  echo "[sslmate]" >> $HOME/.aws/credentials
+  echo "aws_access_key_id = AKIAJC7GTUKKTSBJG2EQ" >> $HOME/.aws/credentials
+  echo "aws_secret_access_key = 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" >> $HOME/.aws/credentials
+fi
+
+# Purchase in a fully automated fashion with DNS approval.
+sslmate buy \
+  --auto-renew \
+  --batch \
+  --approval=dns \
+  $HOST
+
+# Now install the new certificate we have.
+<%= node[:sslmate][:prefix] %>/sbin/sslmate_$HOST_install

@@ -1,0 +1,3 @@
+<% node[:sslmate][:domains].each do |domain| -%>
+<%= domain[:host] %>. route53 aws_credentials_profile=sslmate
+<% end -%>

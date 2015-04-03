@@ -46,4 +46,4 @@ sslmate buy \
   $HOST
 
 # Now install the new certificate we have.
-<%= node[:sslmate][:prefix] %>/sbin/sslmate_$HOST_install
+<%= node[:sslmate][:prefix] %>/sbin/sslmate_<%= @domain[:host] %>_install

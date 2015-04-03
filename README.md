@@ -67,7 +67,9 @@ The `manage_domains` recipe will install sslmate and some additional helper scri
   route53:GetChange on arn:aws:route53:::change/*
   route53:ListResourceRecordSets on arn:aws:route53:::hostedzone/HOSTED_ZONE_ID
   route53:ChangeResourceRecordSets on arn:aws:route53:::hostedzone/HOSTED_ZONE_ID
-  iam:UploadServerCertificate on *
+  iam:ListServerCertificates on arn:aws:iam::ACCOUNT_ID:server-certificate/DOMAIN_NAME-sslmate/*
+  iam:UploadServerCertificate on arn:aws:iam::ACCOUNT_ID:server-certificate/DOMAIN_NAME-sslmate/*
+  iam:DeleteServerCertificate on arn:aws:iam::ACCOUNT_ID:server-certificate/DOMAIN_NAME-sslmate/*
   elasticloadbalancing:SetLoadBalancerListenerSSLCertificate on arn:aws:elasticloadbalancing:REGION_NAME:ACCOUNT_ID:loadbalancer/LOAD_BALANCER_NAME
   ```
 

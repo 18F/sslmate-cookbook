@@ -2,9 +2,11 @@
 set -e
 
 HOST="<%= @domain[:host] %>"
-ELB_NAME="<%= @domain[:elb_name] %>"
-CERT_NAME="$HOST-$(date -u +%FT%H-%M-%SZ)"
-AWS_DEFAULT_PROFILE=sslmate
+CERT_NAME_PREFIX="$HOST-sslmate"
+CERT_NAME="$CERT_NAME_PREFIX-$(date -u +%FT%H-%M-%SZ)"
+KEEP_PREVIOUS_CERTS=<%= @domain[:keep_previous_certs] %>
+HOME="/root"
+AWS_PROFILE="sslmate"
 
 # Only run as root to protect the SSLMate and AWS credentials.
 if [[ $EUID -ne 0 ]]; then
@@ -12,17 +14,26 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# Retrieve any sslmate certs already in place for this domain so we can clean
+# them up after installing the new one.
+OLD_CERT_NAMES=$(aws iam list-server-certificates \
+  --profile $AWS_PROFILE \
+  --path-prefix "/$CERT_NAME_PREFIX/" \
+  --query 'ServerCertificateMetadataList[*].[ServerCertificateName]' \
+  --output text)
+
 # Upload the certificate under a new timestamped name.
-RESPONSE=$(aws iam upload-server-certificate \
+CERT_ARN=$(aws iam upload-server-certificate \
+  --profile $AWS_PROFILE \
+  --path /$CERT_NAME_PREFIX/ \
   --server-certificate-name $CERT_NAME \
   --certificate-body file:///etc/sslmate/$HOST.crt \
   --private-key file:///etc/sslmate/$HOST.key \
-  --certificate-chain file:///etc/sslmate/$HOST.chain.crt)
+  --certificate-chain file:///etc/sslmate/$HOST.chain.crt \
+  --query 'ServerCertificateMetadata.[Arn]' \
+  --output text)
 
-# Poor man's JSON parsing to figure out the certificate ID.
-CERT_ID=$(echo $RESPONSE | sed -n -e 's/.*"Arn": *"\([^"]*\)".*/\1/p')
-
-if [ -z "$CERT_ID" ]; then
+if [ -z "$CERT_ARN" ]; then
   echo "Could not determine certificate ID. Did it upload successfully?" 1>&2
   exit 1
 fi
@@ -30,8 +41,29 @@ fi
 <% @domain[:elbs].each do |elb| %>
 # Set each ELB that should use this certificate.
 aws elb set-load-balancer-listener-ssl-certificate \
+  --profile $AWS_PROFILE \
   --region <%= elb[:region] %> \
   --load-balancer-name <%= elb[:name] %> \
-  --load-balancer-port <%= elb[:port] || 443 %> \
-  --ssl-certificate-id $CERT_ID
+  --load-balancer-port <%= elb[:port] %> \
+  --ssl-certificate-id $CERT_ARN
 <% end %>
+
+# Delete all the old certs except the last <%= @domain[:keep_previous_certs] %>
+# (we typically don't delete the last one, just so we can easily revert to a
+# previous certificate if something went wrong).
+DELETE_CERT_NAMES=$(echo "$OLD_CERT_NAMES" | sort -r | tail -n +$(($KEEP_PREVIOUS_CERTS + 1)))
+if [ ! -z "$DELETE_CERT_NAMES" ]; then
+  for OLD_CERT_NAME in $DELETE_CERT_NAMES; do
+    # Just an extra sanity check to ensure we're not unexpectedly deleting the
+    # currently active cert that just got installed (this condition shouldn't
+    # happen, but we want to be extra sure we don't delete the active cert).
+    if [ "$OLD_CERT_NAME" = "$CERT_NAME" ]; then
+      echo "Unexpectedly attempting to delete the active certificate $CERT_NAME" 1>&2
+      exit 1
+    fi
+
+    aws iam delete-server-certificate \
+      --profile $AWS_PROFILE \
+      --server-certificate-name $OLD_CERT_NAME
+  done
+fi

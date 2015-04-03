@@ -34,8 +34,8 @@ if ! grep -q "^\[sslmate\]" $HOME/.aws/credentials > /dev/null 2>&1; then
 
   # Install the AWS credentials under a "sslmate" profile.
   echo "[sslmate]" >> $HOME/.aws/credentials
-  echo "aws_access_key_id = AKIAJC7GTUKKTSBJG2EQ" >> $HOME/.aws/credentials
-  echo "aws_secret_access_key = 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" >> $HOME/.aws/credentials
+  echo "aws_access_key_id = $AWS_ACCESS_KEY" >> $HOME/.aws/credentials
+  echo "aws_secret_access_key = $AWS_SECRET_KEY" >> $HOME/.aws/credentials
 fi
 
 # Purchase in a fully automated fashion with DNS approval.

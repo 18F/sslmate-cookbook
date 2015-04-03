@@ -2,6 +2,7 @@
 set -e
 
 HOST="<%= @domain[:host] %>"
+REISSUE_DAYS=<%= @domain[:reissue_days] %>
 HOME="/root"
 
 # Only run as root to protect the SSLMate and AWS credentials.
@@ -10,8 +11,19 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-# If sslmate downloads a new certificate, then that means it's automatically
-# been renewed for us. Proceed to install it.
-if sslmate download $HOST > /dev/null; then
-  <%= node[:sslmate][:prefix] %>/sbin/sslmate_$HOST_install
+# Every <%= @domain[:reissue_days] %> days, reissue the cert to ensure
+# everything's working in a fully automated fashion.
+TIMESTAMP=$(date +%s)
+SHOULD_REISSUE=$(( ($TIMESTAMP / 86400) % $REISSUE_DAYS ))
+if [[ $SHOULD_REISSUE -eq 0 ]]; then
+  sslmate reissue $HOST
+  <%= node[:sslmate][:prefix] %>/sbin/sslmate_<%= @domain[:host] %>_install
+
+# Otherwise, every night check for a newly renewed certificate.
+else
+  # If sslmate downloads a new certificate, then that means it's automatically
+  # been renewed for us. Proceed to install it.
+  if sslmate download $HOST > /dev/null; then
+    <%= node[:sslmate][:prefix] %>/sbin/sslmate_<%= @domain[:host] %>_install
+  fi
 fi
